@@ -77,8 +77,18 @@ async function deductCoins(telegramId, amount) {
   return { success: true, coins: newCoins };
 }
 
+async function addCoins(telegramId, amount) {
+  const user = await getOrCreateUser(telegramId);
+  const newCoins = user.coins + amount;
+
+  await updateCoins(telegramId, newCoins);
+
+  return { success: true, coins: newCoins };
+}
+
 module.exports = {
   getOrCreateUser,
   deductCoins,
+  addCoins,
   updateCoins,
 };

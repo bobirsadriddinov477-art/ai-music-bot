@@ -5,7 +5,8 @@ const https = require("https");
 const TelegramBot = require("node-telegram-bot-api");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Replicate = require("replicate");
-const { getOrCreateUser, deductCoins } = require("./db");
+const { getOrCreateUser, deductCoins, addCoins } = require("./db");
+const registerPaymentHandlers = require("./paymentHandler");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -31,6 +32,8 @@ const TEMP_DIR = path.join(__dirname, "temp");
 if (!fs.existsSync(TEMP_DIR)) {
   fs.mkdirSync(TEMP_DIR);
 }
+
+registerPaymentHandlers(bot, addCoins, getOrCreateUser);
 
 const SYSTEM_PROMPT = `
 You are Triangle Music Bot, a smart and natural AI music assistant inside Telegram.
@@ -97,6 +100,16 @@ Identity:
 - You are Triangle Music Bot.
 - You help create music ideas, prompts, and generation-ready requests.
 - You are creative, practical, and user-focused.
+
+Return only valid JSON in this format:
+{
+  "intent": "music_chat" | "redirect_to_music" | "generate_music",
+  "message": "reply text",
+  "user_reply": "optional short reply before generation",
+  "style_prompt": "prompt for music generation",
+  "lyrics": "optional lyrics",
+  "is_instrumental": true
+}
 `;
 
 async function analyzeUserMessage(userText) {
@@ -220,7 +233,7 @@ bot.on("message", async (msg) => {
 
       await bot.sendMessage(
         chatId,
-        `Salom, men music AI assistantman. Musiqa haqida gaplashamiz yoki xohlasangiz mp3 yaratib beraman.\n\nSizda hozir ${user.coins} coin bor.\nYangi foydalanuvchilarga 30 coin beriladi.\nHar bir music generation 10 coin.\n\nMisollar:\n- dark ambient intro yarat\n- sad piano instrumental\n- night drive uchun qanday music mos\n- romantic pop song yarat\n\nKomandalar:\n/balance\n/help`
+        `Salom, men Triangle Music Botman.\n\nMusiqa haqida gaplashamiz yoki xohlasangiz mp3 yaratib beraman.\n\nSizda hozir ${user.coins} token bor.\nYangi foydalanuvchilarga 30 token beriladi.\nHar bir music generation 10 token.\n\nMisollar:\n- dark ambient intro yarat\n- sad piano instrumental\n- night drive uchun qanday music mos\n- romantic pop song yarat\n\nKomandalar:\n/balance\n/help\n/buy`
       );
       return;
     }
@@ -228,14 +241,18 @@ bot.on("message", async (msg) => {
     if (text === "/help") {
       await bot.sendMessage(
         chatId,
-        "Men ikki xil yordam bera olaman:\n\n1) Musiqa haqida gaplashaman\n2) So‘rasangiz mp3 yarataman\n\nMisollar:\n- dark cinematic mp3 yarat\n- lofi beat qil\n- menga gym uchun vibe tavsiya qil\n- sad piano instrumental\n\nHar bir music generation 10 coin."
+        "Men ikki xil yordam bera olaman:\n\n1) Musiqa haqida gaplashaman\n2) So‘rasangiz mp3 yarataman\n\nMisollar:\n- dark cinematic mp3 yarat\n- lofi beat qil\n- menga gym uchun vibe tavsiya qil\n- sad piano instrumental\n\nHar bir music generation 10 token.\nToken sotib olish: /buy"
       );
       return;
     }
 
     if (text === "/balance") {
       const user = await getOrCreateUser(telegramId);
-      await bot.sendMessage(chatId, `Sizda ${user.coins} coin bor.`);
+      await bot.sendMessage(chatId, `Sizda ${user.coins} token bor.`);
+      return;
+    }
+
+    if (text === "/buy") {
       return;
     }
 
@@ -265,7 +282,7 @@ bot.on("message", async (msg) => {
       if (!coinResult.success) {
         await bot.sendMessage(
           chatId,
-          `Sizda coin yetarli emas. Hozir ${coinResult.coins} coin bor, music yaratish uchun 10 coin kerak.`
+          `Sizda token yetarli emas. Hozir ${coinResult.coins} token bor, music yaratish uchun 10 token kerak.\n\nToken sotib olish: /buy`
         );
         return;
       }
@@ -277,7 +294,7 @@ bot.on("message", async (msg) => {
 
       await bot.sendMessage(
         chatId,
-        `10 coin yechildi. Qoldiq: ${coinResult.coins} coin.\n🎧 Musiqa yaratilmoqda... bu taxminan 30-60 sekund olishi mumkin.`
+        `10 token yechildi. Qoldiq: ${coinResult.coins} token.\n🎧 Musiqa yaratilmoqda... bu taxminan 30-60 sekund olishi mumkin.`
       );
 
       const result = await generateMusicWithReplicate(
@@ -330,15 +347,18 @@ bot.on("message", async (msg) => {
       return;
     }
 
-    console.log("ERROR:", errorText);
+    if (errorText.includes("429") || errorText.toLowerCase().includes("quota")) {
+      await bot.sendMessage(
+        chatId,
+        "AI limiti vaqtincha tugagan. Yaqin orada ishlaydi, keyin yana urinib ko‘ring."
+      );
+      return;
+    }
 
-if (errorText.includes("429") || errorText.toLowerCase().includes("quota")) {
-  await bot.sendMessage(
-    chatId,
-    "AI limiti vaqtincha tugagan. Yaqin orada ishlaydi keyin yana urinib ko‘ring."
-  );
-  return;
-}
+    await bot.sendMessage(
+      chatId,
+      "Hozircha bu so‘rovni ishlab bo‘lmadi. Iltimos, birozdan keyin yana urinib ko‘ring."
+    );
   }
 });
 
