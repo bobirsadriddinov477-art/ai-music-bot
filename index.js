@@ -81,25 +81,9 @@ If details are missing, ask concise questions like:
 
 Prompt improvement:
 If the user gives a short request, expand it into a strong music generation prompt internally.
-Example:
-User: "dark intro"
-Better prompt: "Create a dark cinematic intro with deep atmosphere, tense pads, low bass, subtle percussion, and a dramatic modern trailer vibe."
 
 Language behavior:
 - Reply in the same language as the user.
-- If the user writes in Uzbek, reply in Uzbek naturally.
-- If the user writes in English, reply in English.
-- Keep the wording simple, modern, and human.
-
-Error-safe behavior:
-- If something fails, do not just say “Xatolik bo‘ldi.”
-- Instead say something helpful like:
-  “Bu so‘rovni hozircha ishlata olmadim. Istasangiz boshqacha qilib yozib ko‘ring, masalan: dark piano intro yoki romantic pop instrumental.”
-
-Identity:
-- You are Triangle Music Bot.
-- You help create music ideas, prompts, and generation-ready requests.
-- You are creative, practical, and user-focused.
 
 Return only valid JSON in this format:
 {
@@ -215,6 +199,33 @@ async function sendGeneratedAudio(chatId, audioUrl) {
   fs.unlink(filePath, () => {});
 }
 
+/* ===== PROFESSIONAL ANIMATION ===== */
+
+async function animatedProgress(bot, chatId) {
+  const frames = [
+    "🎧 Musiqa tayyorlanmoqda...\n▱▱▱▱▱▱▱▱▱▱ 0%",
+    "🎧 AI kompozitsiya yaratmoqda...\n▰▱▱▱▱▱▱▱▱▱ 10%",
+    "🎧 Melodiya yozilmoqda...\n▰▰▱▱▱▱▱▱▱▱ 20%",
+    "🎧 Sound dizayn qilinmoqda...\n▰▰▰▰▱▱▱▱▱▱ 40%",
+    "🎧 Mix va mastering...\n▰▰▰▰▰▰▱▱▱▱ 60%",
+    "🎧 Final render...\n▰▰▰▰▰▰▰▰▱▱ 80%",
+    "🎧 Yakunlanmoqda...\n▰▰▰▰▰▰▰▰▰▰ 100%"
+  ];
+
+  const msg = await bot.sendMessage(chatId, frames[0]);
+
+  for (let i = 1; i < frames.length; i++) {
+    await new Promise((r) => setTimeout(r, 1500));
+
+    await bot.editMessageText(frames[i], {
+      chat_id: chatId,
+      message_id: msg.message_id,
+    });
+  }
+
+  return msg.message_id;
+}
+
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = (msg.text || "").trim();
@@ -231,6 +242,8 @@ bot.on("message", async (msg) => {
     if (text === "/start") {
       const user = await getOrCreateUser(telegramId);
 
+      await bot.sendChatAction(chatId, "typing");
+
       await bot.sendMessage(
         chatId,
         `Salom, men Triangle Music Botman.\n\nMusiqa haqida gaplashamiz yoki xohlasangiz mp3 yaratib beraman.\n\nSizda hozir ${user.coins} token bor.\nYangi foydalanuvchilarga 30 token beriladi.\nHar bir music generation 10 token.\n\nMisollar:\n- dark ambient intro yarat\n- sad piano instrumental\n- night drive uchun qanday music mos\n- romantic pop song yarat\n\nKomandalar:\n/balance\n/help\n/buy`
@@ -239,6 +252,8 @@ bot.on("message", async (msg) => {
     }
 
     if (text === "/help") {
+      await bot.sendChatAction(chatId, "typing");
+
       await bot.sendMessage(
         chatId,
         "Men ikki xil yordam bera olaman:\n\n1) Musiqa haqida gaplashaman\n2) So‘rasangiz mp3 yarataman\n\nMisollar:\n- dark cinematic mp3 yarat\n- lofi beat qil\n- menga gym uchun vibe tavsiya qil\n- sad piano instrumental\n\nHar bir music generation 10 token.\nToken sotib olish: /buy"
@@ -287,20 +302,27 @@ bot.on("message", async (msg) => {
         return;
       }
 
+      await bot.sendChatAction(chatId, "typing");
+
       await bot.sendMessage(
         chatId,
         analysis.user_reply || "Bo‘ldi, tayyorlayman."
       );
 
-      await bot.sendMessage(
-        chatId,
-        `10 token yechildi. Qoldiq: ${coinResult.coins} token.\n🎧 Musiqa yaratilmoqda... bu taxminan 30-60 sekund olishi mumkin.`
-      );
+      const progressMessageId = await animatedProgress(bot, chatId);
 
       const result = await generateMusicWithReplicate(
         analysis.style_prompt,
         analysis.lyrics || "",
         Boolean(analysis.is_instrumental)
+      );
+
+      await bot.editMessageText(
+        "🎵 Musiqa tayyor! Yuklab olyapman...",
+        {
+          chat_id: chatId,
+          message_id: progressMessageId,
+        }
       );
 
       const audioUrl = extractAudioUrl(result);
@@ -320,40 +342,6 @@ bot.on("message", async (msg) => {
     );
   } catch (error) {
     console.error("FULL ERROR:", error);
-
-    const errorText =
-      error?.message || JSON.stringify(error) || "Noma'lum xato";
-
-    if (
-      errorText.includes("402") ||
-      errorText.toLowerCase().includes("insufficient credit") ||
-      errorText.toLowerCase().includes("payment required")
-    ) {
-      await bot.sendMessage(
-        chatId,
-        "Replicate balansda pul yetmayapti. Billingga kredit qo‘shsangiz, mp3 yaratib bera olaman."
-      );
-      return;
-    }
-
-    if (
-      errorText.includes("Unexpected token") ||
-      errorText.toLowerCase().includes("json")
-    ) {
-      await bot.sendMessage(
-        chatId,
-        "Bir oz chalkash tushundim. Musiqa bilan bog‘liq qilib yana bir marta yozib yuboring."
-      );
-      return;
-    }
-
-    if (errorText.includes("429") || errorText.toLowerCase().includes("quota")) {
-      await bot.sendMessage(
-        chatId,
-        "AI limiti vaqtincha tugagan. Yaqin orada ishlaydi, keyin yana urinib ko‘ring."
-      );
-      return;
-    }
 
     await bot.sendMessage(
       chatId,

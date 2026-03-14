@@ -1,11 +1,17 @@
 const plans = require("./plans");
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
   bot.onText(/\/buy/, async (msg) => {
     const chatId = msg.chat.id;
     const telegramId = String(msg.from.id);
 
     const user = await getOrCreateUser(telegramId);
+
+    await bot.sendChatAction(chatId, "typing");
 
     let text = `💎 Token sotib olish\n\n`;
     text += `Sizda hozir ${user.coins} token bor.\n`;
@@ -45,7 +51,36 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
         return;
       }
 
-      await bot.answerCallbackQuery(query.id);
+      await bot.answerCallbackQuery(query.id, {
+        text: "To‘lov oynasi tayyorlanmoqda...",
+      });
+
+      const loadingMessage = await bot.sendMessage(
+        chatId,
+        "💳 To‘lov oynasi ochilmoqda...\n▱▱▱▱▱▱▱▱▱▱"
+      );
+
+      await sleep(700);
+
+      await bot.editMessageText(
+        "💳 To‘lov oynasi tayyorlanmoqda...\n▰▰▰▱▱▱▱▱▱▱",
+        {
+          chat_id: chatId,
+          message_id: loadingMessage.message_id,
+        }
+      );
+
+      await sleep(700);
+
+      await bot.editMessageText(
+        "💳 Xavfsiz to‘lov oynasi ochilmoqda...\n▰▰▰▰▰▰▰▰▰▰",
+        {
+          chat_id: chatId,
+          message_id: loadingMessage.message_id,
+        }
+      );
+
+      await sleep(500);
 
       await bot.sendInvoice(
         chatId,
@@ -78,13 +113,33 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
         return;
       }
 
+      const paymentMessage = await bot.sendMessage(
+        chatId,
+        "💰 To‘lov tekshirilmoqda...\n▱▱▱▱▱▱▱▱▱▱"
+      );
+
+      await sleep(800);
+
+      await bot.editMessageText(
+        "💰 Balans yangilanmoqda...\n▰▰▰▰▱▱▱▱▱▱",
+        {
+          chat_id: chatId,
+          message_id: paymentMessage.message_id,
+        }
+      );
+
       await addCoins(telegramId, plan.coins);
 
       const updatedUser = await getOrCreateUser(telegramId);
 
-      await bot.sendMessage(
-        chatId,
-        `✅ To‘lov qabul qilindi.\n${plan.coins} token qo‘shildi.\n\nHozirgi balans: ${updatedUser.coins} token.`
+      await sleep(800);
+
+      await bot.editMessageText(
+        `✅ To‘lov qabul qilindi.\n${plan.coins} token qo‘shildi.\n\nHozirgi balans: ${updatedUser.coins} token.`,
+        {
+          chat_id: chatId,
+          message_id: paymentMessage.message_id,
+        }
       );
     } catch (error) {
       console.error("SUCCESSFUL PAYMENT ERROR:", error);
