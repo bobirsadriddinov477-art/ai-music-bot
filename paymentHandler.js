@@ -13,20 +13,20 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
 
     await bot.sendChatAction(chatId, "typing");
 
-    let text = `💎 Token sotib olish\n\n`;
-    text += `Sizda hozir ${user.coins} token bor.\n`;
-    text += `Har bir music generation — 10 token.\n\n`;
-    text += `Quyidagi paketlardan birini tanlang:\n\n`;
+    let text = `💎 Buy Tokens\n\n`;
+    text += `You currently have ${user.coins} tokens.\n`;
+    text += `Each music generation costs 10 tokens.\n\n`;
+    text += `Choose one of the packages below:\n\n`;
 
     for (const plan of plans) {
-      text += `⭐ ${plan.name} — ${plan.coins} token — ${plan.stars} Stars\n${plan.description}\n\n`;
+      text += `⭐ ${plan.name} — ${plan.coins} tokens — ${plan.stars} Stars\n${plan.description}\n\n`;
     }
 
     await bot.sendMessage(chatId, text, {
       reply_markup: {
         inline_keyboard: plans.map((plan) => [
           {
-            text: `${plan.name} • ${plan.coins} token • ${plan.stars}⭐`,
+            text: `${plan.name} • ${plan.coins} tokens • ${plan.stars}⭐`,
             callback_data: `buy_${plan.id}`,
           },
         ]),
@@ -45,25 +45,25 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
 
       if (!plan) {
         await bot.answerCallbackQuery(query.id, {
-          text: "Paket topilmadi.",
+          text: "Package not found.",
           show_alert: true,
         });
         return;
       }
 
       await bot.answerCallbackQuery(query.id, {
-        text: "To‘lov oynasi tayyorlanmoqda...",
+        text: "Preparing payment window...",
       });
 
       const loadingMessage = await bot.sendMessage(
         chatId,
-        "💳 To‘lov oynasi ochilmoqda...\n▱▱▱▱▱▱▱▱▱▱"
+        "💳 Opening payment window...\n▱▱▱▱▱▱▱▱▱▱"
       );
 
       await sleep(700);
 
       await bot.editMessageText(
-        "💳 To‘lov oynasi tayyorlanmoqda...\n▰▰▰▱▱▱▱▱▱▱",
+        "💳 Preparing payment window...\n▰▰▰▱▱▱▱▱▱▱",
         {
           chat_id: chatId,
           message_id: loadingMessage.message_id,
@@ -73,7 +73,7 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
       await sleep(700);
 
       await bot.editMessageText(
-        "💳 Xavfsiz to‘lov oynasi ochilmoqda...\n▰▰▰▰▰▰▰▰▰▰",
+        "💳 Opening secure payment window...\n▰▰▰▰▰▰▰▰▰▰",
         {
           chat_id: chatId,
           message_id: loadingMessage.message_id,
@@ -85,7 +85,7 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
       await bot.sendInvoice(
         chatId,
         `${plan.name} Token Pack`,
-        `${plan.coins} token. ${plan.description}`,
+        `${plan.coins} tokens. ${plan.description}`,
         plan.id,
         "",
         "XTR",
@@ -109,19 +109,19 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
 
       const plan = plans.find((p) => p.id === payload);
       if (!plan) {
-        await bot.sendMessage(chatId, "To‘lov qabul qilindi, lekin paket topilmadi.");
+        await bot.sendMessage(chatId, "Payment received, but package not found.");
         return;
       }
 
       const paymentMessage = await bot.sendMessage(
         chatId,
-        "💰 To‘lov tekshirilmoqda...\n▱▱▱▱▱▱▱▱▱▱"
+        "💰 Verifying payment...\n▱▱▱▱▱▱▱▱▱▱"
       );
 
       await sleep(800);
 
       await bot.editMessageText(
-        "💰 Balans yangilanmoqda...\n▰▰▰▰▱▱▱▱▱▱",
+        "💰 Updating balance...\n▰▰▰▰▱▱▱▱▱▱",
         {
           chat_id: chatId,
           message_id: paymentMessage.message_id,
@@ -135,7 +135,7 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
       await sleep(800);
 
       await bot.editMessageText(
-        `✅ To‘lov qabul qilindi.\n${plan.coins} token qo‘shildi.\n\nHozirgi balans: ${updatedUser.coins} token.`,
+        `✅ Payment received.\n${plan.coins} tokens have been added.\n\nCurrent balance: ${updatedUser.coins} tokens.`,
         {
           chat_id: chatId,
           message_id: paymentMessage.message_id,
@@ -145,7 +145,7 @@ function registerPaymentHandlers(bot, addCoins, getOrCreateUser) {
       console.error("SUCCESSFUL PAYMENT ERROR:", error);
       await bot.sendMessage(
         msg.chat.id,
-        "To‘lov qabul qilindi, lekin balansni yangilashda xatolik bo‘ldi. Admin bilan bog‘laning."
+        "Payment was received, but there was an error updating the balance. Please contact the admin."
       );
     }
   });
